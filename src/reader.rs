@@ -311,7 +311,13 @@ impl NBReader {
         // discard eventual errors, EOF will be handled in read_until correctly
         let _ = self.read_into_buffer();
         if !self.buffer.is_empty() {
-            self.buffer.drain(..1).last()
+            match &self.encoding {
+                Encoding::ASCII => self.buffer.drain(..1).last(),
+                Encoding::UTF8 => {
+                    let first_char_len = self.buffer.chars().next().unwrap().len_utf8();
+                    self.buffer.drain(..first_char_len).last()
+                }
+            }
         } else {
             None
         }
