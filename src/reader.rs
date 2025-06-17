@@ -152,7 +152,7 @@ impl NBReader {
                         if options.strip_ansi_escape_codes && byte[0] == 27 {
                             in_escape_code = true;
                         } else if options.strip_ansi_escape_codes && in_escape_code {
-                            if char::from(byte[0]).is_alphabetic() {
+                           if char::from(byte[0]).is_alphabetic() {
                                 in_escape_code = false;
                             }
                         } else {
