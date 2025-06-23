@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+<!-- next-header -->
+## [Unreleased] - ReleaseDate
+
+## [0.6.2] - 2025-06-18
+
+### Fixes
+
+- Ensure consistent behavior through `TERM=`
+
+## [0.6.1] - 2025-05-01
+
+### Compatibility
+
+- MSRV updated to 1.70
+
+### Internal
+
+- Update `nix`, `which`, `thiserror`
+
+## [0.6.0] - 2024-11-06
+
+### Compatibility
+
+- `PtyProcess::get_file_handle()` returns an error if dup() fails
+- `spawn_bash()` returns error if `tempfile::NamedTempFile::new()` or `write!()` fails
+- Renamed `Error::SendContolError` to `Error::SendControlError`
+- MSRV updated to 1.65
+
+### Feature
+
+- "which" functionality was added (feature gated)
+- Option to skip ansi escape codes
+
+### Fixed
+
+- file descriptor leak was fixed in `PtyProcess::new()`
+- Documentation cleanup
+
 ## [0.5.0] 2022-10-09
 
 ### Changed
@@ -16,7 +54,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Fix https link to pexpect docs
 - Many clippy fixes
-- Remove unnecesary closures
+- Remove unnecessary closures
 - Fix EOF detection on nightly
 - Fix examples
 
@@ -67,3 +105,9 @@ All `exp_*` methods now also return the yet unread string and/or the matched str
 
 - each execution of rexpect left a temporary file in /tmp/ this is now no longer the case
 - try_read was blocking when there was no char ready (!) -> fixed
+
+<!-- next-url -->
+[Unreleased]: https://github.com/rust-cli/rexpect/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/rust-cli/rexpect/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/rust-cli/rexpect/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/rust-cli/argfile/compare/v0.5.0...v0.6.0

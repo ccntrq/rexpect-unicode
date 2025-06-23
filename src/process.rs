@@ -3,15 +3,17 @@
 use crate::error::Error;
 use nix;
 use nix::fcntl::{open, OFlag};
-use nix::libc::{STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
+use nix::libc::STDERR_FILENO;
 use nix::pty::{grantpt, posix_openpt, unlockpt, PtyMaster};
 pub use nix::sys::{signal, wait};
 use nix::sys::{stat, termios};
-use nix::unistd::{close, dup, dup2, fork, setsid, ForkResult, Pid};
+use nix::unistd::{
+    close, dup, dup2_stderr, dup2_stdin, dup2_stdout, fork, setsid, ForkResult, Pid,
+};
 use std;
 use std::fs::File;
 use std::io;
-use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::os::unix::io::AsRawFd;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::{thread, time};
@@ -19,7 +21,7 @@ use std::{thread, time};
 /// Start a process in a forked tty so you can interact with it the same as you would
 /// within a terminal
 ///
-/// The process and pty session are killed upon dropping PtyProcess
+/// The process and pty session are killed upon dropping `PtyProcess`
 ///
 /// # Example
 ///
@@ -40,8 +42,8 @@ use std::{thread, time};
 /// # fn main() {
 ///
 /// let mut process = PtyProcess::new(Command::new("cat")).expect("could not execute cat");
-/// let fd = dup(process.pty.as_raw_fd()).unwrap();
-/// let f = unsafe { File::from_raw_fd(fd) };
+/// let fd = dup(&process.pty).unwrap();
+/// let f = File::from(fd);
 /// let mut writer = LineWriter::new(&f);
 /// let mut reader = BufReader::new(&f);
 /// process.exit().expect("could not terminate process");
@@ -109,12 +111,12 @@ impl PtyProcess {
                 )?;
 
                 // assign stdin, stdout, stderr to the tty, just like a terminal does
-                dup2(slave_fd, STDIN_FILENO)?;
-                dup2(slave_fd, STDOUT_FILENO)?;
-                dup2(slave_fd, STDERR_FILENO)?;
+                dup2_stdin(&slave_fd)?;
+                dup2_stdout(&slave_fd)?;
+                dup2_stderr(&slave_fd)?;
 
                 // Avoid leaking slave fd
-                if slave_fd > STDERR_FILENO {
+                if slave_fd.as_raw_fd() > STDERR_FILENO {
                     close(slave_fd)?;
                 }
 
@@ -138,12 +140,12 @@ impl PtyProcess {
     /// Get handle to pty fork for reading/writing
     pub fn get_file_handle(&self) -> Result<File, Error> {
         // needed because otherwise fd is closed both by dropping process and reader/writer
-        let fd = dup(self.pty.as_raw_fd())?;
-        unsafe { Ok(File::from_raw_fd(fd)) }
+        let fd = dup(&self.pty)?;
+        Ok(fd.into())
     }
 
-    /// At the drop of PtyProcess the running process is killed. This is blocking forever if
-    /// the process does not react to a normal kill. If kill_timeout is set the process is
+    /// At the drop of `PtyProcess` the running process is killed. This is blocking forever if
+    /// the process does not react to a normal kill. If `kill_timeout` is set the process is
     /// `kill -9`ed after duration
     pub fn set_kill_timeout(&mut self, timeout_ms: Option<u64>) {
         self.kill_timeout = timeout_ms.map(time::Duration::from_millis);
@@ -197,7 +199,7 @@ impl PtyProcess {
     /// Kill the process with a specific signal. This method blocks, until the process is dead
     ///
     /// repeatedly sends SIGTERM to the process until it died,
-    /// the pty session is closed upon dropping PtyMaster,
+    /// the pty session is closed upon dropping `PtyMaster`,
     /// so we don't need to explicitly do that here.
     ///
     /// if `kill_timeout` is set and a repeated sending of signal does not result in the process
@@ -218,10 +220,10 @@ impl PtyProcess {
                 Some(status) if status != wait::WaitStatus::StillAlive => return Ok(status),
                 Some(_) | None => thread::sleep(time::Duration::from_millis(100)),
             }
-            // kill -9 if timout is reached
+            // kill -9 if timeout is reached
             if let Some(timeout) = self.kill_timeout {
                 if start.elapsed() > timeout {
-                    signal::kill(self.child_pid, signal::Signal::SIGKILL).map_err(Error::from)?
+                    signal::kill(self.child_pid, signal::Signal::SIGKILL).map_err(Error::from)?;
                 }
             }
         }
@@ -244,7 +246,7 @@ mod tests {
 
     #[test]
     /// Open cat, write string, read back string twice, send Ctrl^C and check that cat exited
-    fn test_cat() -> std::io::Result<()> {
+    fn test_cat() -> io::Result<()> {
         let process = PtyProcess::new(Command::new("cat")).expect("could not execute cat");
         let f = process.get_file_handle().unwrap();
         let mut writer = LineWriter::new(&f);
